@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Test Prep Planner API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: plans
+    description: Study plans and checklist progress
+  - name: runs
+    description: Syllabus processing and execution history
 paths:
   /healthz:
     get:
@@ -24,6 +28,245 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /plans:
+    get:
+      operationId: listPlans
+      tags: [plans]
+      summary: List saved study plans
+      responses:
+        "200":
+          description: Saved plans for the signed-in user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlanSummary"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /plans/{planId}:
+    get:
+      operationId: getPlan
+      tags: [plans]
+      summary: Get a saved study plan
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Study plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanDetail"
+        "404":
+          description: Plan not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /plans/{planId}/items/{itemId}:
+    patch:
+      operationId: updatePlanItem
+      tags: [plans]
+      summary: Update checklist completion
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistUpdate"
+      responses:
+        "200":
+          description: Updated checklist item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistItem"
+        "400":
+          description: Invalid update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Plan item not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /runs:
+    get:
+      operationId: listRuns
+      tags: [runs]
+      summary: List saved processing runs
+      responses:
+        "200":
+          description: Recent runs for the signed-in user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RunSummary"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: createRun
+      tags: [runs]
+      summary: Save a syllabus draft and stream plan creation events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunInput"
+      responses:
+        "200":
+          description: Server-sent processing events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: Invalid syllabus input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /runs/{runId}/continue:
+    post:
+      operationId: continueRun
+      tags: [runs]
+      summary: Continue a saved run after choosing a missing test date
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunContinueInput"
+      responses:
+        "200":
+          description: Server-sent processing events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: Invalid date
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /runs/{runId}/retry-questions:
+    post:
+      operationId: retryRunQuestions
+      tags: [runs]
+      summary: Retry practice question generation
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Server-sent question generation events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "404":
+          description: Run or plan not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /runs/{runId}/checklist-shown:
+    post:
+      operationId: markChecklistShown
+      tags: [runs]
+      summary: Record that the generated checklist was rendered
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Checklist shown event recorded
+        "404":
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /runs/{runId}:
+    get:
+      operationId: getRun
+      tags: [runs]
+      summary: Get a run and its stored events for replay
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Run event history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunDetail"
+        "404":
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +276,111 @@ components:
           type: string
       required:
         - status
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    PlanSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        testDate: { type: string, format: date }
+        createdAt: { type: string, format: date-time }
+        completedCount: { type: integer }
+        totalCount: { type: integer }
+        runId: { type: string, format: uuid }
+      required: [id, title, testDate, createdAt, completedCount, totalCount, runId]
+    PlanDetail:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        testDate: { type: string, format: date }
+        createdAt: { type: string, format: date-time }
+        sourceText: { type: string }
+        runId: { type: string, format: uuid }
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanDay"
+      required: [id, title, testDate, createdAt, sourceText, runId, days]
+    PlanDay:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChecklistItem"
+      required: [id, date, items]
+    ChecklistItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        subject: { type: string }
+        topic: { type: string }
+        checked: { type: boolean }
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeQuestion"
+      required: [id, subject, topic, checked, questions]
+    PracticeQuestion:
+      type: object
+      properties:
+        question: { type: string }
+        answer: { type: string }
+      required: [question, answer]
+    ChecklistUpdate:
+      type: object
+      properties:
+        checked: { type: boolean }
+      required: [checked]
+    RunInput:
+      type: object
+      properties:
+        sourceText: { type: string, minLength: 1, maxLength: 20000 }
+      required: [sourceText]
+    RunContinueInput:
+      type: object
+      properties:
+        testDate: { type: string, format: date }
+      required: [testDate]
+    RunEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        stepId: { type: string }
+        stepName: { type: string }
+        status: { type: string, enum: [started, finished, failed, skipped] }
+        durationMs: { type: integer }
+        detail: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, stepId, stepName, status, durationMs, detail, createdAt]
+    RunSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [processing, needs_date, complete, partial, failed] }
+        sourceText: { type: string }
+        planId: { type: ["string", "null"], format: uuid }
+        createdAt: { type: string, format: date-time }
+      required: [id, status, sourceText, planId, createdAt]
+    RunDetail:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [processing, needs_date, complete, partial, failed] }
+        sourceText: { type: string }
+        planId: { type: ["string", "null"], format: uuid }
+        createdAt: { type: string, format: date-time }
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunEvent"
+      required: [id, status, sourceText, planId, createdAt, events]
 

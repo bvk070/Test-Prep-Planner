@@ -1,0 +1,1 @@
+- [Generated client DOM types](generated-client-dom-iterable.md) — Orval-generated fetch clients that call `Headers.entries()` need `dom.iterable` in TypeScript `lib`.

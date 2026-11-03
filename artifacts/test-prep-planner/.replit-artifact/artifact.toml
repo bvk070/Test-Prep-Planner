@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Test Prep Planner"
+description = "A responsive study planner that turns a pasted school syllabus into a dated practice checklist, with saved run history and a live diagram showing exactly how each plan was created."
+version = "1.0.0"
+id = "artifacts/test-prep-planner"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18770
+
+[services.development]
+run = "pnpm --filter @workspace/test-prep-planner run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/test-prep-planner", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/test-prep-planner/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18770"
+BASE_PATH = "/"
